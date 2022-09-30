@@ -148,12 +148,22 @@ class BackendHandler(Handler):
     if c_first_cuda_only and c_last_only:
       raise ValueError(
           "c_first_cuda_only and c_last_only can not both be True.")
+    input_size = len(node.inputs)
+    if (name == 'Transpose'):
+         inputs = inputs[0]
+         input_shape = inputs.get_shape().as_list()
+         if(len(input_shape) == 2):
+             input_shape = [1, input_shape[0], input_shape[1]]
+         inputs = tf.reshape(inputs, input_shape)
+         inputs = [inputs]
+    name = node.name
+    if name != "":
+        attrs["name"] = name
 
     if c_first_cuda_only:
       return cls.c_first_cuda_only(tf_func, inputs, attrs)
     elif c_last_only:
       return cls.c_last_only(tf_func, inputs, attrs)
-
     return cls._run_tf_func(tf_func, inputs, attrs)
 
   @classmethod
@@ -221,9 +231,7 @@ class BackendHandler(Handler):
         params = inspect.getargspec(tf_func).args
       else:
         params = inspect.getargspec(tf_func).args
-
     attrs = cls._process_attrs(attrs)
-
     if "name" in attrs.keys():
       attrs["name"] = "onnx_tf_prefix_" + attrs["name"]
 
@@ -234,4 +242,7 @@ class BackendHandler(Handler):
     if ambiguous_arguments:
       raise TypeError('Ambiguous arguments for {}()'.format(tf_func.__name__))
     kwargs.update((p, v) for p, v in attrs.items() if v is not None)
+    
+    #print("tiffany in _run_tf_func", kwargs)
+
     return tf_func(**kwargs)

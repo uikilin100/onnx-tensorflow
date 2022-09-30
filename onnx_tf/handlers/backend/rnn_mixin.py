@@ -25,24 +25,33 @@ class RNNMixin(object):
       "thresholded_relu": tf.keras.layers.ThresholdedReLU,
   }
 
-  rnn_cell = None
+  #rnn_cell = None
+  rnn_cell = {}
 
   @classmethod
-  def rnn(cls, x, cell_class, cell_kwargs, rnn_kwargs, activations, direction):
+  def rnn(cls, x, name, cell_class, cell_kwargs, rnn_kwargs, activations, direction):
     cell_kwargs["activation"] = activations[0]
 
-    if cls.rnn_cell is None:
-      cls.rnn_cell = [cell_class(**cell_kwargs)]
-    rnn_cell = cls.rnn_cell
+    #if cls.rnn_cell[name] is None:
+    if cls.rnn_cell.get(name) is None:
+      print("tiffany cls.rnn_cell is none")
+      cls.rnn_cell[name] = [cell_class(**cell_kwargs)]
+    
+    rnn_cell = cls.rnn_cell[name]
+    print("tiffany ==> name=", name, "rnn_cell=", rnn_cell)
     cell_fw = tf.compat.v1.nn.rnn_cell.MultiRNNCell(rnn_cell)
-
+    #cell_fw = tf.keras.layers.RNN(rnn_cell, unroll=True, return_state=True)
+     
     if direction == "bidirectional":
       cell_kwargs["activation"] = activations[1]
       rnn_cell_bw = [cell_class(**cell_kwargs)]
       cell_bw = tf.compat.v1.nn.rnn_cell.MultiRNNCell(rnn_cell_bw)
-
     if direction == "forward":
-      outputs, states = tf.compat.v1.nn.dynamic_rnn(cell_fw, x, **rnn_kwargs)
+      #tiffany
+      #outputs, states = tf.compat.v1.nn.dynamic_rnn(cell_fw, x, **rnn_kwargs)
+      outputs, states = tf.compat.v1.nn.static_rnn(cell_fw, x, **rnn_kwargs)
+      #print("tiffany x=", x)
+      #outputs, states = cell_fw(x, **rnn_kwargs)
     elif direction == "bidirectional":
       outputs, states = tf.compat.v1.nn.bidirectional_dynamic_rnn(
           cell_fw, cell_bw, x, **rnn_kwargs)

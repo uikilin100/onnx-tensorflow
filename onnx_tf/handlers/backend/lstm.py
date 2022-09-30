@@ -170,9 +170,21 @@ class LSTM(RNNMixin, BackendHandler):
     num_directions = 2 if direction == "bidirectional" else 1
     layout = node.attrs.get("layout", 0)
 
+    name = node.name
+    print("tiffany input_shape =" , input_shape, input_size, hidden_size)
+    print("tiffany node.inputs", node.inputs, name)
+    
+    #w = tensor_dict.get(node.inputs[1], None)
+    #print("w=", w)
+
     # Need transpose for batchwise
     if layout == 1:
       x = tf.transpose(x, perm=[1, 0, 2])
+    
+    #tiffany try to unfold begin
+    x = tf.unstack(x, axis=0)
+    print("tiffany x=", x)
+    #tiffany try to unfold end
 
     # removed from version 7, default is 0
     output_sequence = node.attrs.get("output_sequence", 0)
@@ -182,11 +194,14 @@ class LSTM(RNNMixin, BackendHandler):
     # which has shape [seq_length, num_directions, batch_size, hidden_size]
     if len(input_shape) == 4 and input_shape[1] == 1:
       x = tf.squeeze(x)
+    
+    #add by tiffany
+    if len(input_shape) == 2 and input_shape[0] == 1:
+      x = tf.expand_dims(x,0)
 
     sequence_length = None
     if input_size >= 5 and node.inputs[4] in tensor_dict:
       sequence_length = tensor_dict[node.inputs[4]]
-
     cell_kwargs = {}
 
     if "clip" in node.attrs:
@@ -218,6 +233,7 @@ class LSTM(RNNMixin, BackendHandler):
           "use_peepholes"] = input_size == 8 and node.inputs[7] in tensor_dict
       cell_kwargs["forget_bias"] = 0.
       cell_kwargs["num_units"] = hidden_size
+      #cell_kwargs["units"] = hidden_size
       initial_state = None
       initial_state_bw = None
       if input_size >= 6:
@@ -225,6 +241,8 @@ class LSTM(RNNMixin, BackendHandler):
         initial_c = tensor_dict.get(
             node.inputs[6],
             None) if input_size >= 7 else tf.zeros_like(initial_h)
+        print('initial_h', initial_h, initial_h[0])
+        print('initial_c', initial_c, initial_c[0])
         # Need transpose for batchwise
         if layout == 1:
             initial_h = tf.transpose(initial_h, perm=[1, 0, 2])
@@ -232,6 +250,7 @@ class LSTM(RNNMixin, BackendHandler):
         if initial_h is not None and initial_c is not None:
           initial_state = (tf.compat.v1.nn.rnn_cell.LSTMStateTuple(
               initial_c[0], initial_h[0]),)
+          print("tiffany create initial_state", initial_state)
           if num_directions == 2:
             initial_state_bw = (tf.compat.v1.nn.rnn_cell.LSTMStateTuple(
                 initial_c[1], initial_h[1]),)
@@ -242,16 +261,23 @@ class LSTM(RNNMixin, BackendHandler):
       elif num_directions == 2:
         rnn_kwargs["initial_state_fw"] = initial_state
         rnn_kwargs["initial_state_bw"] = initial_state_bw
-      rnn_kwargs["sequence_length"] = sequence_length
-      rnn_kwargs["time_major"] = True
-      rnn_kwargs["dtype"] = tf.float32
+      
+      #mark out by tiffany for using static rnn begin
+      #rnn_kwargs["sequence_length"] = sequence_length
+      #rnn_kwargs["time_major"] = True
+      #rnn_kwargs["dtype"] = tf.float32
+      #mark out by tiffany for using static rnn end
 
-      outputs, states = cls.rnn(x, tf.compat.v1.nn.rnn_cell.LSTMCell,
+      outputs, states = cls.rnn(x, name, tf.compat.v1.nn.rnn_cell.LSTMCell,
                                 cell_kwargs, rnn_kwargs, tf_activations,
                                 direction)
+      #outputs, states = cls.rnn(x, name, tf.keras.layers.LSTMCell,
+      #                          cell_kwargs, rnn_kwargs, tf_activations,
+      #                          direction)
 
     if num_directions == 1:
       state = states[0]
+      #state = states
       c = tf.expand_dims(state[0], 0)
       h = tf.expand_dims(state[1], 0)
       output = tf.expand_dims(outputs, 1)

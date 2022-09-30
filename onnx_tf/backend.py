@@ -301,6 +301,7 @@ class TensorflowBackend(Backend):
           ":", "_tf_") + "_" + get_unique_suffix() if ":" in name else name
 
     if training_mode:
+      print("tiffany ===> training_mode")
       tensor_dict = [
           (init.name,
            tf.Variable(np.array(tensor2list(init)).reshape(init.dims),
@@ -310,6 +311,7 @@ class TensorflowBackend(Backend):
           for init in initializer
       ]
     else:
+      print("tiffany ===> not training_mode")
       tensor_dict = [(init.name,
                       tf.constant(tensor2list(init),
                                   shape=init.dims,
